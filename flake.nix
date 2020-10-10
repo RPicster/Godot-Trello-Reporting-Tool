@@ -95,26 +95,147 @@
 
     checks = lib.genAttrs systems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      inherit (self.packages.${system}) godot-gut-headless;
+      inherit (self.packages.${system}) godot-gut;
 
       testRunner = pkgs.writeScriptBin "test-runner" ''
         #!${pkgs.stdenv.shell} -e
         cd ${lib.escapeShellArg self}
-        exec ${godot-gut-headless}/bin/godot-gut -gtest=res://test.gd -gexit
+        exec ${godot-gut}/bin/godot-gut -gtest=res://test.gd -gexit
       '';
+
+      mkSnakeoilCert = domain: pkgs.runCommand "snakeoil-cert" {
+        nativeBuildInputs = [ pkgs.openssl ];
+        OPENSSL_CONF = pkgs.writeText "snakeoil.cnf" ''
+          [req]
+          default_bits = 4096
+          prompt = no
+          default_md = sha256
+          req_extensions = req_ext
+          distinguished_name = dn
+          [dn]
+          CN = ${domain}
+          [req_ext]
+          subjectAltName = DNS:${domain}
+        '';
+      } ''
+        mkdir -p "$out"
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout "$out/key.pem" \
+        -out "$out/cert.pem" -days 36500
+      '';
+
+      certs.proxy = mkSnakeoilCert "proxy.test";
+      certs.trello = mkSnakeoilCert "api.trello.com";
+
+      commonConfig = { config, nodes, ... }: {
+        networking.firewall.enable = false;
+        networking.nameservers = lib.mkForce [
+          nodes.resolver.config.networking.primaryIPAddress
+        ];
+        security.pki.certificateFiles = let
+          getPubkey = drv: "${drv}/cert.pem";
+        in lib.mapAttrsToList (lib.const getPubkey) certs;
+        networking.extraHosts = let
+          allVhosts = config.services.httpd.virtualHosts
+                   // config.services.nginx.virtualHosts;
+        in lib.concatMapStrings (domain: ''
+          127.0.0.1 ${domain}
+          ${config.networking.primaryIPAddress} ${domain}
+        '') (lib.attrNames allVhosts);
+      };
 
     in {
       integration = import (nixpkgs + "/nixos/tests/make-test-python.nix") {
         name = "godot-trello-reporting";
 
-        nodes = {
-          client.environment.systemPackages = lib.singleton testRunner;
+        nodes.resolver = nixpkgs + "/nixos/tests/common/resolver.nix";
+
+        nodes.client = {
+          imports = [ commonConfig (nixpkgs + "/nixos/tests/common/x11.nix") ];
+          hardware.opengl.driSupport = true;
+          virtualisation.memorySize = 1024;
+          environment.systemPackages = lib.singleton testRunner;
+          boot.kernelModules = [ "snd-dummy" ];
+          sound.enable = true;
+        };
+
+        nodes.proxy = {
+          imports = [ commonConfig ];
+          services.httpd.enable = true;
+          services.httpd.enablePHP = true;
+          services.httpd.adminAddr = "admin@proxy.test";
+          services.httpd.virtualHosts."proxy.test" = {
+            forceSSL = true;
+            enableACME = false;
+            sslServerCert = "${certs.proxy}/cert.pem";
+            sslServerKey = "${certs.proxy}/key.pem";
+            documentRoot = self;
+          };
+        };
+
+        nodes.trello = { config, pkgs, ... }: {
+          imports = [ commonConfig ];
+          services.nginx.enable = true;
+          services.nginx.virtualHosts."api.trello.com" = {
+            forceSSL = true;
+            enableACME = false;
+            sslCertificate = "${certs.trello}/cert.pem";
+            sslCertificateKey = "${certs.trello}/key.pem";
+            locations."/".extraConfig = ''
+              include ${config.services.nginx.package}/conf/uwsgi_params;
+              uwsgi_intercept_errors on;
+              uwsgi_ignore_client_abort on;
+              uwsgi_pass unix:///run/minitrello.socket;
+            '';
+          };
+
+          systemd.sockets.minitrello = {
+            description = "Socket for minimal Trello API Server";
+            wantedBy = [ "sockets.target" ];
+            socketConfig.ListenStream = "/run/minitrello.socket";
+            socketConfig.SocketUser = "root";
+            socketConfig.SocketGroup = "nginx";
+            socketConfig.SocketMode = "0660";
+          };
+
+          systemd.services.minitrello = {
+            description = "Minimal Trello API Server";
+            requiredBy = [ "multi-user.target" ];
+            after = [ "network.target" ];
+
+            serviceConfig.Type = "notify";
+            serviceConfig.DynamicUser = true;
+            serviceConfig.ExecStart = let
+              uwsgi = pkgs.uwsgi.override {
+                plugins = [ "python3" ];
+                withPAM = false;
+                withSystemd = true;
+              };
+              python3 = pkgs.python3.withPackages (p: lib.singleton p.flask);
+            in lib.escapeShellArgs [
+              "${uwsgi}/bin/uwsgi" "--die-on-term" "--auto-procname"
+              "--procname-prefix-spaced=[minitrello]"
+              "--socket" "/run/minitrello.socket"
+              "--plugins" "python3" "--callable=app" "--enable-threads"
+              "--pythonpath" "${python3}/${python3.sitePackages}"
+              "--mount" "=${./minitrello.py}"
+            ];
+          };
         };
 
         testScript = ''
           # fmt: off
-          client.wait_for_unit('multi-user.target')
-          client.succeed('test-runner')
+          start_all()
+          resolver.wait_for_unit('bind.service')
+          trello.wait_for_unit('nginx.service')
+          trello.wait_for_open_port(443)
+          proxy.wait_for_unit('httpd.service')
+          proxy.wait_for_open_port(443)
+          client.wait_for_x()
+
+          client.succeed('ping -c1 proxy.test >&2')
+          proxy.succeed('ping -c1 api.trello.com >&2')
+
+          client.succeed('test-runner >&2')
         '';
       } { inherit system; };
     });
