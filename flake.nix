@@ -123,7 +123,7 @@
         -out "$out/cert.pem" -days 36500
       '';
 
-      certs.proxy = mkSnakeoilCert "proxy.test";
+      certs.proxy = mkSnakeoilCert "proxy.example";
       certs.trello = mkSnakeoilCert "api.trello.com";
 
       commonConfig = { config, nodes, ... }: {
@@ -162,8 +162,8 @@
           imports = [ commonConfig ];
           services.httpd.enable = true;
           services.httpd.enablePHP = true;
-          services.httpd.adminAddr = "admin@proxy.test";
-          services.httpd.virtualHosts."proxy.test" = {
+          services.httpd.adminAddr = "admin@proxy.example";
+          services.httpd.virtualHosts."proxy.example" = {
             forceSSL = true;
             enableACME = false;
             sslServerCert = "${certs.proxy}/cert.pem";
@@ -244,7 +244,7 @@
           proxy.wait_for_open_port(443)
           client.wait_for_x()
 
-          client.succeed('ping -c1 proxy.test >&2')
+          client.succeed('ping -c1 proxy.example >&2')
           proxy.succeed('ping -c1 api.trello.com >&2')
 
           client.succeed('test-runner >&2')
