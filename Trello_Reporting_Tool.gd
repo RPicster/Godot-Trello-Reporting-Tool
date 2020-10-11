@@ -5,8 +5,11 @@ extends Panel
 const PROXY_HOST = 'proxy.example'
 const PROXY_PATH = '/proxy.php'
 
-# if you don't want to use labels, just leave this dictionary empty, you can add as many labels as you need by just expanding the library
-# to find out the label ids, use the same way as with the list ids. look for the label ids in the Trello json.
+# If you don't want to use labels, just leave this dictionary empty, you can
+# add as many labels as you need by just expanding the library.
+#
+# To find out the label ids, use the same way as with the list ids. look for
+# the label ids in the Trello json.
 var trello_labels = {
 	0 : {
 		"label_trello_id"	: "LABEL ID FROM TRELLO",
@@ -94,8 +97,10 @@ func create_card():
 
 	var timeout = 30.0
 	timer.start()
-	while http.get_status() == HTTPClient.STATUS_CONNECTING or \
-		  http.get_status() == HTTPClient.STATUS_RESOLVING:
+	while http.get_status() in [
+		HTTPClient.STATUS_CONNECTING,
+		HTTPClient.STATUS_RESOLVING
+	]:
 		http.poll()
 		yield(timer, 'timeout')
 		timeout -= timer.get_wait_time()
@@ -125,8 +130,10 @@ func create_card():
 			return
 	timer.stop()
 
-	if http.get_status() != HTTPClient.STATUS_BODY and \
-	   http.get_status() != HTTPClient.STATUS_CONNECTED:
+	if not http.get_status() in [
+		HTTPClient.STATUS_BODY,
+		HTTPClient.STATUS_CONNECTED
+	]:
 		feedback.text = "Unable to connect to server :-("
 		return
 
