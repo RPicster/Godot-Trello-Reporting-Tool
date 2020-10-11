@@ -51,7 +51,7 @@ class Card(NamedTuple):
 
 class Attachment(NamedTuple):
     id: str
-    bytes: Optional[str] = None
+    bytes: Optional[int]
     date: date_ = date_.today()
     edgeColor: Optional[str] = None
     idMember: str = ''
@@ -61,6 +61,9 @@ class Attachment(NamedTuple):
     previews: List[str] = []
     url: str = ''
     pos: int = 0
+
+    # Extra field, not in Trello responses.
+    chksum: Optional[str] = None
 
 
 def is_valid_arg(name, regex):
@@ -89,7 +92,7 @@ def create_card() -> Any:
     if idlist is None:
         return app.make_response(('idList required', 400))
 
-    if not is_valid_arg('idList', '^[0-9a-fA-F]{32}$'):
+    if not is_valid_arg('idList', '^[0-9a-fA-F]{24}$'):
         return app.make_response(('invalid idList value', 400))
 
     if idlist not in trello_lists:
@@ -105,8 +108,8 @@ def create_card() -> Any:
     else:
         newpos = float(pos)
 
-    trello_lists[idlist].append(Card(
-        uuid4().hex,
+    newcard = Card(
+        uuid4().hex[:24],
         pos=newpos,
         address=request.values.get('address'),
         coordinates=request.values.get('coordinates'),
@@ -118,17 +121,18 @@ def create_card() -> Any:
         locationName=request.values.get('locationName'),
         name=request.values.get('name', ''),
         url=request.values.get('urlSource', ''),
-    ))
+    )
 
+    trello_lists[idlist].append(newcard)
     trello_lists[idlist].sort(key=lambda c: c.pos)
 
-    return 'OK'
+    return jsonify(newcard._asdict())
 
 
 @app.route('/1/cards/<cardid>/idLabels', methods=['POST'])
 @trello_api_call
 def add_label(cardid: str) -> Any:
-    if re.match('^[0-9a-fA-F]{32}$', cardid) is None:
+    if re.match('^[0-9a-fA-F]{24}$', cardid) is None:
         return app.make_response(('invalid cardid value', 400))
 
     newlabel = request.values.get('value')
@@ -137,20 +141,25 @@ def add_label(cardid: str) -> Any:
             for card in cards:
                 if card.id == cardid.lower():
                     card.idLabels.append(newlabel)
-    return 'OK'
+                    return jsonify(card.idLabels)
+
+    return app.make_response(('invalid value for value', 400))
 
 
 @app.route('/1/cards/<cardid>/attachments', methods=['POST'])
 @trello_api_call
 def add_attachment(cardid: str) -> Any:
-    if re.match('^[0-9a-fA-F]{32}$', cardid) is None:
+    if re.match('^[0-9a-fA-F]{24}$', cardid) is None:
         return app.make_response(('invalid cardid value', 400))
 
     mimetype = ''
     filename = ''
+    filesize = None
+    chksum = None
     if 'file' in request.files:
         reqfile = request.files['file']
         with mmap(reqfile.fileno(), 0, prot=PROT_READ) as data:
+            filesize = len(data)
             chksum = sha256(cast(bytes, data)).hexdigest()
         mimetype = reqfile.mimetype
         filename = reqfile.filename
@@ -159,16 +168,19 @@ def add_attachment(cardid: str) -> Any:
         trello_attachments[cardid] = []
 
     pos = len(trello_attachments[cardid])
-
-    trello_attachments[cardid].append(Attachment(
-        uuid4().hex,
-        bytes=chksum,
+    newattachment = Attachment(
+        uuid4().hex[:24],
+        bytes=filesize,
+        chksum=chksum,
         pos=pos,
         mimeType=request.values.get('mimeType', mimetype),
         name=request.values.get('name', filename),
-    ))
+    )
 
-    return 'OK'
+    trello_attachments[cardid].append(newattachment)
+    adict = newattachment._asdict()
+    del adict['chksum']
+    return jsonify(adict)
 
 
 @app.route('/1/lists/<listid>/cards', methods=['GET'])

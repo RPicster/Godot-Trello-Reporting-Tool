@@ -20,9 +20,9 @@ func test_simple() -> void:
     # XXX: Ideally the node would be properly parametrizable, so let's override
     #      the variables we need to be changed in the ugliest way possible:
     scene.trello_labels = {
-        0: {'label_trello_id': '7f657925d36b4ec9a3406d3a2979b338',
+        0: {'label_trello_id': '7f657925d36b4ec9a3406d3a',
             'label_description': 'Test label 1'},
-        1: {'label_trello_id': '89daa2cc49014f0d9c3526d32511c155',
+        1: {'label_trello_id': '89daa2cc49014f0d9c3526d3',
             'label_description': 'Test label 2'},
     }
 
@@ -43,7 +43,7 @@ func test_simple() -> void:
     assert_eq(feedback_node.text, expected)
 
     var state: Dictionary = yield(get_trello_state(), 'completed')
-    var list_id: String = '44b3a1b2db65488e8ba5a9dfba1dd9aa'
+    var list_id: String = '44b3a1b2db65488e8ba5a9df'
 
     assert_has(state, 'lists')
     assert_has(state['lists'], list_id)
@@ -68,8 +68,9 @@ func test_simple() -> void:
     assert_eq(state['attachments'][card.id].size(), 1)
     var attachment: Dictionary = state['attachments'][card.id][0]
 
+    assert_eq(attachment.bytes as int, 3305)
     assert_eq(
-        attachment.bytes,
+        attachment.chksum,
         # SHA-256 of icon.png:
         '2c160bfdb8d0423b958083202dc7b58d499cbef22f28d2a58626884378ce9b7f'
     )

@@ -36,7 +36,7 @@ if (empty($_POST['name']) || empty($_POST['desc'])) {
 
 $label_id = $_POST['label_id'] ?? null;
 
-if ($label_id !== null && !preg_match('/^[0-9a-fA-F]{32}$/', $label_id)) {
+if ($label_id !== null && !preg_match('/^[0-9a-fA-F]{24}$/', $label_id)) {
     http_response_code(400);
     exit('invalid label_id');
 }
@@ -133,7 +133,7 @@ if ($card_id === null) {
     exit('unable to find card with identifier '.$identifier);
 }
 
-if (!preg_match('/^[0-9a-fA-F]{32}$/', $card_id)) {
+if (!preg_match('/^[0-9a-fA-F]{24}$/', $card_id)) {
     http_response_code(502);
     curl_close($ch);
     exit('unable to find valid card_id with identifier '.$identifier);
