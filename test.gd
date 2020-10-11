@@ -1,5 +1,7 @@
 extends "res://addons/gut/test.gd"
 
+const BASEPATH = 'Trello_Reporting_Tool/VBoxContainer/HBoxContainer/'
+
 func get_trello_state() -> Dictionary:
     var req = HTTPRequest.new()
     add_child_autoqfree(req)
@@ -12,10 +14,26 @@ func get_trello_state() -> Dictionary:
     assert_eq(json.error, OK)
     return json.result
 
-func test_simple() -> void:
+func assert_feedback(expected: String) -> void:
+    assert_eq(get_node(BASEPATH + 'Custom/feedback').text, expected)
+
+func submit_report(title: String, body: String, label: int = -1) -> void:
+    get_node(BASEPATH + 'ShortDescEdit').text = title
+    get_node(BASEPATH + 'LongDescEdit').text = body
+    if label != -1:
+        get_node(BASEPATH + 'Custom/Type').selected = label
+    get_node(BASEPATH + 'Custom/Send').emit_signal('pressed')
+
+func wait_for_feedback(expected: String) -> void:
+    for timeout in range(60):
+        if get_node(BASEPATH + 'Custom/feedback').text == expected:
+            break
+        yield(yield_for(1), YIELD)
+
+    assert_feedback(expected)
+
+func before_each() -> void:
     var scene = load('res://Trello_Reporting_Tool.tscn').instance()
-    var basepath = 'Trello_Reporting_Tool/VBoxContainer/HBoxContainer/'
-    add_child_autofree(scene)
 
     # XXX: Ideally the node would be properly parametrizable, so let's override
     #      the variables we need to be changed in the ugliest way possible:
@@ -26,21 +44,14 @@ func test_simple() -> void:
             'label_description': 'Test label 2'},
     }
 
-    get_node(basepath + 'ShortDescEdit').text = 'some report'
-    get_node(basepath + 'LongDescEdit').text = 'some report text'
-    get_node(basepath + 'Custom/Send').emit_signal('pressed')
+    add_child_autofree(scene)
 
-    var feedback_node = get_node(basepath + 'Custom/feedback')
+func test_simple() -> void:
+    submit_report('some report', 'some report text')
+    assert_feedback('Your feedback is being sent...')
 
-    assert_eq(feedback_node.text, 'Your feedback is being sent...')
-
-    var expected = 'Feedback sent successfully, thank you!'
-    for timeout in range(60):
-        if feedback_node.text == expected:
-            break
-        yield(yield_for(1), YIELD)
-
-    assert_eq(feedback_node.text, expected)
+    yield(wait_for_feedback('Feedback sent successfully, thank you!'),
+          'completed')
 
     var state: Dictionary = yield(get_trello_state(), 'completed')
     var list_id: String = '44b3a1b2db65488e8ba5a9df'
@@ -77,3 +88,10 @@ func test_simple() -> void:
 
     assert_eq(attachment.name, 'Image-' + identifier)
     assert_eq(attachment.mimeType, 'image/png')
+
+func test_empty_title() -> void:
+    submit_report('', 'non-empty')
+    assert_feedback('Your feedback is being sent...')
+
+    yield(wait_for_feedback('Error from server: insufficient data'),
+          'completed')

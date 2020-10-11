@@ -125,6 +125,31 @@ func create_card():
 			return
 	timer.stop()
 
+	if http.get_status() != HTTPClient.STATUS_BODY and \
+	   http.get_status() != HTTPClient.STATUS_CONNECTED:
+		feedback.text = "Unable to connect to server :-("
+		return
+
+	if http.has_response() && http.get_response_code() != 200:
+		timeout = 30.0
+		timer.start()
+		var response: PoolByteArray
+		while http.get_status() == HTTPClient.STATUS_BODY:
+			http.poll()
+			var chunk = http.read_response_body_chunk()
+			if chunk.size() == 0:
+				yield(timer, 'timeout')
+				timeout -= timer.get_wait_time()
+				if timeout < 0.0:
+					feedback.text = "Timeout waiting for server response :-("
+					timer.stop()
+					return
+			else:
+				response += chunk
+		timer.stop()
+		feedback.text = 'Error from server: ' + response.get_string_from_utf8()
+		return
+
 	feedback.text = "Feedback sent successfully, thank you!"
 
 func show_feedback():
