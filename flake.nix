@@ -85,6 +85,44 @@
       godot-gut = mkGodotGut false;
       godot-gut-headless = mkGodotGut true;
 
+      gdtoolkit = pkgs.python3Packages.buildPythonApplication rec {
+        pname = "gdtoolkit";
+        version = "3.2.8";
+
+        src = pkgs.fetchFromGitHub {
+          owner = "Scony";
+          repo = "godot-gdscript-toolkit";
+          rev = version;
+          sha256 = "1i0y2n636lnmgdivnq49zjd99dh3k4rjcpdyn20qfd2g2w8dmk6j";
+        };
+
+        propagatedBuildInputs = [
+          # We need to have *exactly* version 0.8.0 to prevent test failures
+          # and ultimately gdtoolkit from misbehaving.
+          (pkgs.python3Packages.lark-parser.overridePythonAttrs (drv: rec {
+            version = "0.8.0";
+            src = pkgs.fetchFromGitHub {
+              owner = "lark-parser";
+              repo = "lark";
+              rev = version;
+              sha256 = "sha256-su7kToZ05OESwRCMPG6Z+XlFUvbEb3d8DgsTEcPJMg4=";
+            };
+          }))
+          pkgs.python3Packages.docopt
+          pkgs.python3Packages.pyyaml
+          pkgs.python3Packages.setuptools
+        ];
+
+        checkInputs = [
+          pkgs.python3Packages.pytest
+          (pkgs.writeScriptBin "godot-server" ''
+            #!${pkgs.stdenv.shell}
+            exec ${pkgs.godot-headless}/bin/godot-headless "$@"
+          '')
+        ];
+        checkPhase = "HOME=\"$PWD\" PATH=\"$out/bin:$PATH\" pytest";
+      };
+
       minitrello = pkgs.runCommand "minitrello" rec {
         uwsgi = pkgs.uwsgi.override {
           plugins = [ "python3" ];
@@ -115,11 +153,21 @@
         chmod +x "$out/bin/minitrello"
       '';
 
-      trello-reporting = pkgs.writeScriptBin "godot-trello-reporting" ''
-        #!${pkgs.stdenv.shell}
-        exec ${pkgs.godot}/bin/godot \
-          ${lib.escapeShellArg "${self}/Trello_Reporting_Tool.tscn"} \
-          "$@"
+      trello-reporting = pkgs.runCommand "godot-trello-reporting" {
+        src = self;
+        nativeBuildInputs = [ self.packages.${system}.gdtoolkit ];
+      } ''
+        HOME="$PWD" gdlint "$src"
+        mkdir -p "$out/libexec"
+        cp -rT "$src" "$out/libexec/godot-trello-reporting"
+
+        mkdir -p "$out/bin"
+        { echo ${lib.escapeShellArg "#!${pkgs.stdenv.shell}"}
+          echo exec ${pkgs.godot}/bin/godot \
+            "$out/libexec/godot-trello-reporting/Trello_Reporting_Tool.tscn" \
+            '"$@"'
+        } > "$out/bin/godot-trello-reporting"
+        chmod +x "$out/bin/godot-trello-reporting"
       '';
 
       proxy = pkgs.runCommand "godot-trello-proxy" {
@@ -146,11 +194,12 @@
 
     checks = lib.genAttrs systems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      inherit (self.packages.${system}) godot-gut;
+      inherit (self.packages.${system}) godot-gut trello-reporting;
 
+      srcPath = "${trello-reporting}/libexec/godot-trello-reporting";
       testRunner = pkgs.writeScriptBin "test-runner" ''
         #!${pkgs.stdenv.shell} -e
-        cd ${lib.escapeShellArg self}
+        cd ${lib.escapeShellArg srcPath}
         exec ${godot-gut}/bin/godot-gut -gtest=res://test.gd -gexit
       '';
 
@@ -307,6 +356,7 @@
       nativeBuildInputs = [
         pkgs.godot
         self.packages.${system}.godot-gut
+        self.packages.${system}.gdtoolkit
         self.packages.${system}.proxy
       ];
     });
@@ -314,7 +364,7 @@
     hydraJobs = {
       tests = self.checks.x86_64-linux;
       packages = removeAttrs self.packages.x86_64-linux [
-        "godot-gut" "godot-gut-headless"
+        "godot-gut" "godot-gut-headless" "gdtoolkit"
       ];
     };
   };
