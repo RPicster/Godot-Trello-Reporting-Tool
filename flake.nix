@@ -85,6 +85,36 @@
       godot-gut = mkGodotGut false;
       godot-gut-headless = mkGodotGut true;
 
+      minitrello = pkgs.runCommand "minitrello" rec {
+        uwsgi = pkgs.uwsgi.override {
+          plugins = [ "python3" ];
+          withPAM = false;
+          withSystemd = true;
+        };
+        nativeBuildInputs = [
+          pkgs.python3Packages.flake8
+          pkgs.python3Packages.mypy
+        ];
+        python3 = pkgs.python3.withPackages (p: lib.singleton p.flask);
+        src = ./minitrello.py;
+        cmdArgs = lib.escapeShellArgs [
+          "${uwsgi}/bin/uwsgi" "--die-on-term" "--auto-procname"
+          "--procname-prefix-spaced=[minitrello]"
+          "--plugins" "python3" "--callable=app" "--enable-threads"
+          "--pythonpath" "${python3}/${python3.sitePackages}"
+        ];
+      } ''
+        flake8 "$src"
+        mypy "$src"
+        install -vD -m 0644 "$src" "$out/libexec/minitrello.py"
+        mkdir -p "$out/bin"
+        { echo ${lib.escapeShellArg "#!${pkgs.stdenv.shell}"}
+          echo exec "$cmdArgs" --mount "=$out/libexec/minitrello.py" \
+                               --http 127.0.0.1:4444
+        } > "$out/bin/minitrello"
+        chmod +x "$out/bin/minitrello"
+      '';
+
       trello-reporting = pkgs.writeScriptBin "godot-trello-reporting" ''
         #!${pkgs.stdenv.shell}
         exec ${pkgs.godot}/bin/godot \
@@ -92,15 +122,25 @@
           "$@"
       '';
 
-      proxy = pkgs.writeScriptBin "godot-trello-proxy" ''
-        #!${pkgs.stdenv.shell}
-        exec ${pkgs.php}/bin/php \
-          -d error_reporting=E_ALL \
-          -d display_errors=Off \
-          -d log_errors=On \
-          -S 127.0.0.1:3333 \
-          -t ${lib.escapeShellArg self} \
-          "$@"
+      proxy = pkgs.runCommand "godot-trello-proxy" {
+        src = ./proxy.php;
+        nativeBuildInputs = [ pkgs.php ];
+        cmdArgs = lib.escapeShellArgs [
+          "${pkgs.php}/bin/php"
+          "-d" "error_reporting=E_ALL"
+          "-d" "display_errors=Off"
+          "-d" "log_errors=On"
+          "-S" "127.0.0.1:3333"
+          "-t" "${placeholder "out"}/libexec/godot-trello-proxy"
+        ];
+      } ''
+        php -l "$src"
+        install -vD -m 0644 "$src" "$out/libexec/godot-trello-proxy/proxy.php"
+        mkdir -p "$out/bin"
+        { echo ${lib.escapeShellArg "#!${pkgs.stdenv.shell}"}
+          echo exec "$cmdArgs" '"$@"'
+        } > "$out/bin/godot-trello-proxy"
+        chmod +x "$out/bin/godot-trello-proxy"
       '';
     });
 
@@ -169,7 +209,7 @@
           sound.enable = true;
         };
 
-        nodes.proxy = {
+        nodes.proxy = { config, ... }: {
           imports = [ commonConfig ];
           services.httpd.enable = true;
           services.httpd.enablePHP = true;
@@ -180,7 +220,9 @@
             sslServerCert = "${certs.proxy}/cert.pem";
             sslServerKey = "${certs.proxy}/key.pem";
             documentRoot = pkgs.runCommand "docroot" {
-              src = "${self}/proxy.php";
+              src = let
+                inherit (self.packages.${config.nixpkgs.system}) proxy;
+              in "${proxy}/libexec/godot-trello-proxy/proxy.php";
               YOUR_TRELLO_API_KEY = "6686ab7c98c9478a858c7509cce4e567";
               YOUR_TRELLO_API_TOKEN = "903a96bcb0f2457986ed6f4e4d4d5016"
                                     + "04ea488a45034e57aea56a16ed59528a";
@@ -228,20 +270,12 @@
             serviceConfig.Type = "notify";
             serviceConfig.DynamicUser = true;
             serviceConfig.ExecStart = let
-              uwsgi = pkgs.uwsgi.override {
-                plugins = [ "python3" ];
-                withPAM = false;
-                withSystemd = true;
-              };
-              python3 = pkgs.python3.withPackages (p: lib.singleton p.flask);
-            in lib.escapeShellArgs [
-              "${uwsgi}/bin/uwsgi" "--die-on-term" "--auto-procname"
-              "--procname-prefix-spaced=[minitrello]"
-              "--socket" "/run/minitrello.socket"
-              "--plugins" "python3" "--callable=app" "--enable-threads"
-              "--pythonpath" "${python3}/${python3.sitePackages}"
-              "--mount" "=${./minitrello.py}"
-            ];
+              inherit (self.packages.${config.nixpkgs.system}) minitrello;
+              extraArgs = lib.escapeShellArgs [
+                "--mount" "=${minitrello}/libexec/minitrello.py"
+                "--socket" "/run/minitrello.socket"
+              ];
+            in "${minitrello.cmdArgs} ${extraArgs}";
           };
         };
 
@@ -276,5 +310,12 @@
         self.packages.${system}.proxy
       ];
     });
+
+    hydraJobs = {
+      tests = self.checks.x86_64-linux;
+      packages = removeAttrs self.packages.x86_64-linux [
+        "godot-gut" "godot-gut-headless"
+      ];
+    };
   };
 }
