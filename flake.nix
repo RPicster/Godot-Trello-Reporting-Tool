@@ -85,14 +85,14 @@
       godot-gut = mkGodotGut false;
       godot-gut-headless = mkGodotGut true;
 
-      godot-trello-reporting = pkgs.writeScriptBin "godot-trello-reporting" ''
+      trello-reporting = pkgs.writeScriptBin "godot-trello-reporting" ''
         #!${pkgs.stdenv.shell}
         exec ${pkgs.godot}/bin/godot \
           ${lib.escapeShellArg "${self}/Trello_Reporting_Tool.tscn"} \
           "$@"
       '';
 
-      godot-trello-proxy = pkgs.writeScriptBin "godot-trello-proxy" ''
+      proxy = pkgs.writeScriptBin "godot-trello-proxy" ''
         #!${pkgs.stdenv.shell}
         exec ${pkgs.php}/bin/php \
           -d error_reporting=E_ALL \
@@ -264,7 +264,7 @@
     });
 
     defaultPackage = let
-      getPackage = system: self.packages.${system}.godot-trello-reporting;
+      getPackage = system: self.packages.${system}.trello-reporting;
     in lib.genAttrs systems getPackage;
 
     devShell = lib.genAttrs systems (system: let
@@ -273,7 +273,7 @@
       nativeBuildInputs = [
         pkgs.godot
         self.packages.${system}.godot-gut
-        self.packages.${system}.godot-trello-proxy
+        self.packages.${system}.proxy
       ];
     });
   };
