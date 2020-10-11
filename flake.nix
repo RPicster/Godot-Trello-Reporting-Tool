@@ -168,7 +168,19 @@
             enableACME = false;
             sslServerCert = "${certs.proxy}/cert.pem";
             sslServerKey = "${certs.proxy}/key.pem";
-            documentRoot = self;
+            documentRoot = pkgs.runCommand "docroot" {
+              src = "${self}/proxy.php";
+              YOUR_TRELLO_API_KEY = "6686ab7c98c9478a858c7509cce4e567";
+              YOUR_TRELLO_API_TOKEN = "903a96bcb0f2457986ed6f4e4d4d5016"
+                                    + "04ea488a45034e57aea56a16ed59528a";
+              YOUR_TRELLO_LIST_ID = "44b3a1b2db65488e8ba5a9dfba1dd9aa";
+            } ''
+              mkdir "$out"
+              substitute "$src" "$out/proxy.php" \
+                --subst-var YOUR_TRELLO_API_KEY \
+                --subst-var YOUR_TRELLO_API_TOKEN \
+                --subst-var YOUR_TRELLO_LIST_ID
+            '';
           };
         };
 
