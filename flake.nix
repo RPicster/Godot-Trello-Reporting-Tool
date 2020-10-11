@@ -91,6 +91,17 @@
           ${lib.escapeShellArg "${self}/Trello_Reporting_Tool.tscn"} \
           "$@"
       '';
+
+      godot-trello-proxy = pkgs.writeScriptBin "godot-trello-proxy" ''
+        #!${pkgs.stdenv.shell}
+        exec ${pkgs.php}/bin/php \
+          -d error_reporting=E_ALL \
+          -d display_errors=Off \
+          -d log_errors=On \
+          -S 127.0.0.1:3333 \
+          -t ${lib.escapeShellArg self} \
+          "$@"
+      '';
     });
 
     checks = lib.genAttrs systems (system: let
@@ -259,7 +270,11 @@
     devShell = lib.genAttrs systems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in pkgs.mkShell {
-      nativeBuildInputs = [ pkgs.godot self.packages.${system}.godot-gut ];
+      nativeBuildInputs = [
+        pkgs.godot
+        self.packages.${system}.godot-gut
+        self.packages.${system}.godot-trello-proxy
+      ];
     });
   };
 }
