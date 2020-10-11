@@ -94,50 +94,21 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, [
     'pos' => 'top',
 ]);
 
-if (curl_exec($ch) === false) {
+if (($card = curl_exec($ch)) === false) {
     http_response_code(502);
     curl_close($ch);
     exit('unable to create card');
 }
 
-$url = 'https://api.trello.com/1/lists/'.TRELLO_LIST_ID.'/cards';
-curl_setopt($ch, CURLOPT_URL, $url.'?'.http_build_query([
-    'token' => TRELLO_TOKEN,
-    'key' => TRELLO_KEY,
-]));
-curl_setopt($ch, CURLOPT_HTTPGET, true);
+$card = json_decode($card, true);
 
-if (($response = curl_exec($ch)) === false) {
+if ($card === null || !array_key_exists('id', $card)) {
     http_response_code(502);
     curl_close($ch);
-    exit('unable to determine card ID');
+    exit('unable to find card identifier');
 }
 
-if (($cards = json_decode($response, true)) === null) {
-    http_response_code(502);
-    curl_close($ch);
-    exit('unable to decode card ID');
-}
-
-$card_id = null;
-
-foreach ($cards as $card) {
-    if (strpos($card['name'], $identifier) !== false) {
-        $card_id = $card['id'];
-    }
-}
-
-if ($card_id === null) {
-    http_response_code(502);
-    curl_close($ch);
-    exit('unable to find card with identifier '.$identifier);
-}
-
-if (!preg_match('/^[0-9a-fA-F]{24}$/', $card_id)) {
-    http_response_code(502);
-    curl_close($ch);
-    exit('unable to find valid card_id with identifier '.$identifier);
-}
+$card_id = $card['id'];
 
 if ($label_id !== null) {
     $url = 'https://api.trello.com/1/cards/'.$card_id.'/idLabels';
