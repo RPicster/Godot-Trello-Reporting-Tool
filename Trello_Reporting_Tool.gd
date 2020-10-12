@@ -5,6 +5,8 @@ extends Panel
 const PROXY_HOST = 'proxy.example'
 const PROXY_PATH = '/proxy.php'
 
+const POST_BOUNDARY: String = 'GodotFileUploadBoundaryZ29kb3RmaWxl'
+
 # If you don't want to use labels, just leave this dictionary empty, you can
 # add as many labels as you need by just expanding the library.
 #
@@ -43,38 +45,75 @@ func _on_Send_pressed():
 	send_button.disabled = true
 	create_card()
 
+class Attachment:
+	# XXX: This is to prevent reference cycles (and thus memleaks), see:
+	# https://github.com/godotengine/godot/issues/27491
+	class Struct:
+		var filename: String
+		var mimetype: String
+		var data: PoolByteArray
+
+	static func from_path(path: String) -> Attachment.Struct:
+		var obj = Attachment.Struct.new()
+		obj.filename = path.get_file()
+
+		match path.get_extension():
+			'png':
+				obj.mimetype = 'image/png'
+			'jpg', 'jpeg':
+				obj.mimetype = 'image/jpeg'
+			'gif':
+				obj.mimetype = 'image/gif'
+			_:
+				obj.mimetype = 'application/octet-stream'
+
+		var file = File.new()
+		if file.open(path, File.READ) != OK:
+			return null
+		obj.data = file.get_buffer(file.get_len())
+		file.close()
+
+		return obj
+
+	static func from_image(img: Image, name: String) -> Attachment.Struct:
+		var obj = Attachment.Struct.new()
+		obj.filename = name + '.png'
+		obj.mimetype = 'image/png'
+		obj.data = img.save_png_to_buffer()
+		return obj
+
+func create_post_data(key: String, value) -> PoolByteArray:
+	var body: PoolByteArray
+	var extra: String = ''
+	var bytes: PoolByteArray
+
+	if value is Array:
+		for idx in range(0, value.size()):
+			var newkey = "%s[%d]" % [key, idx]
+			body += create_post_data(newkey, value[idx])
+		return body
+	elif value is Attachment.Struct:
+		extra = '; filename="' + value.filename + '"'
+		if value.mimetype != 'application/octet-stream':
+			extra += '\r\nContent-Type: ' + value.mimetype
+		bytes = value.data
+	elif value != null:
+		bytes = value.to_ascii()
+
+	var buf = 'Content-Disposition: form-data; name="' + key + '"' + extra
+	body += ('--' + POST_BOUNDARY + '\r\n' + buf + '\r\n\r\n').to_ascii()
+	body += bytes + '\r\n'.to_ascii()
+	return body
+
 func send_post(http: HTTPClient, path: String, data: Dictionary) -> int:
-	var boundary: String = 'GodotFileUploadBoundaryZ29kb3RmaWxl'
-	var headers = ['Content-Type: multipart/form-data; boundary=' + boundary]
+	var headers = [
+		'Content-Type: multipart/form-data; boundary=' + POST_BOUNDARY,
+	]
 
 	var body: PoolByteArray
 	for key in data:
-		var value = data[key]
-		var extra: String = ''
-		var bytes: PoolByteArray
-
-		if value is File:
-			var fname = value.get_path().get_file()
-			var mimetype: String
-			match value.get_path().get_extension():
-				'png':
-					mimetype = 'image/png'
-				'jpg', 'jpeg':
-					mimetype = 'image/jpeg'
-				'gif':
-					mimetype = 'image/gif'
-				_:
-					continue
-			extra = '; filename="' + fname + '"\r\nContent-Type: ' + mimetype
-			bytes = value.get_buffer(value.get_len())
-		else:
-			bytes = value.to_ascii()
-
-		var buf = 'Content-Disposition: form-data; name="' + key + '"' + extra
-		body += ('--' + boundary + '\r\n' + buf + '\r\n\r\n').to_ascii()
-		body += bytes + '\r\n'.to_ascii()
-
-	body += ('--' + boundary + '--\r\n').to_ascii()
+		body += create_post_data(key, data[key])
+	body += ('--' + POST_BOUNDARY + '--\r\n').to_ascii()
 
 	return http.request_raw(HTTPClient.METHOD_POST, path, headers, body)
 
@@ -88,10 +127,15 @@ func create_card():
 		var type = $VBoxContainer/HBoxContainer/Custom/Type.selected
 		data['label_id'] = trello_labels[type].label_trello_id
 
-	var attachment = File.new()
-	attachment.open("res://icon.png", File.READ)
-	data['attachment'] = attachment
-	data['cover_file'] = 'attachment'
+	data['cover'] = Attachment.from_path("res://icon.png")
+	data['attachments'] = [
+		Attachment.from_image(
+			OpenSimplexNoise.new().get_image(200, 200), 'noise1'
+		),
+		Attachment.from_image(
+			OpenSimplexNoise.new().get_image(200, 200), 'noise2'
+		),
+	]
 
 	http.connect_to_host(PROXY_HOST, -1, true)
 

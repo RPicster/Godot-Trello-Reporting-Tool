@@ -76,18 +76,29 @@ func test_simple() -> void:
 
     assert_has(state, 'attachments')
     assert_has(state['attachments'], card.id)
-    assert_eq(state['attachments'][card.id].size(), 1)
-    var attachment: Dictionary = state['attachments'][card.id][0]
+    assert_eq(state['attachments'][card.id].size(), 3)
 
-    assert_eq(attachment.bytes as int, 3305)
-    assert_eq(
-        attachment.chksum,
-        # SHA-256 of icon.png:
-        '2c160bfdb8d0423b958083202dc7b58d499cbef22f28d2a58626884378ce9b7f'
-    )
+    var names = []
 
-    assert_eq(attachment.name, 'Image-' + identifier)
-    assert_eq(attachment.mimeType, 'image/png')
+    for attachment in state['attachments'][card.id]:
+        names.push_back(attachment['name'])
+
+        match attachment['name']:
+            'icon.png':
+                assert_eq(attachment['bytes'] as int, 3305)
+                assert_eq(
+                    attachment['chksum'],
+                    # SHA-256 of icon.png:
+                    '2c160bfdb8d0423b958083202dc7b58d' +
+                    '499cbef22f28d2a58626884378ce9b7f'
+                )
+                assert_eq(attachment['mimeType'], 'image/png')
+            _:
+                assert_gt(attachment['bytes'] as int, 0)
+                assert_eq(attachment['mimeType'], 'image/png')
+
+    names.sort()
+    assert_eq(names, ['icon.png', 'noise1.png', 'noise2.png'])
 
 func test_empty_title() -> void:
     submit_report('', 'non-empty')
