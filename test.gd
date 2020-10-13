@@ -1,6 +1,7 @@
 extends "res://addons/gut/test.gd"
 
-const BASEPATH = 'Trello_Reporting_Tool/VBoxContainer/HBoxContainer/'
+const BASEPATH = 'Trello_Reporting_Tool/Content/Form/'
+const FEEDBACK_PATH = 'Trello_Reporting_Tool/Content/Feedback/feedback_label'
 
 func get_trello_state() -> Dictionary:
     var req = HTTPRequest.new()
@@ -15,7 +16,7 @@ func get_trello_state() -> Dictionary:
     return json.result
 
 func assert_feedback(expected: String) -> void:
-    assert_eq(get_node(BASEPATH + 'Custom/feedback').text, expected)
+    assert_eq(get_node(FEEDBACK_PATH).text, expected)
 
 func submit_report(title: String, body: String, label: int = -1) -> void:
     get_node(BASEPATH + 'ShortDescEdit').text = title
@@ -26,7 +27,7 @@ func submit_report(title: String, body: String, label: int = -1) -> void:
 
 func wait_for_feedback(expected: String) -> void:
     for timeout in range(60):
-        if get_node(BASEPATH + 'Custom/feedback').text == expected:
+        if get_node(FEEDBACK_PATH).text == expected:
             break
         yield(yield_for(1), YIELD)
 
