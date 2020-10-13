@@ -115,7 +115,7 @@ func create_post_data(key: String, value) -> PoolByteArray:
 			extra += '\r\nContent-Type: ' + value.mimetype
 		bytes = value.data
 	elif value != null:
-		bytes = value.to_ascii()
+		bytes = value.to_utf8()
 
 	var buf = 'Content-Disposition: form-data; name="' + key + '"' + extra
 	body += ('--' + POST_BOUNDARY + '\r\n' + buf + '\r\n\r\n').to_ascii()

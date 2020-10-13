@@ -47,7 +47,7 @@ func before_each() -> void:
     add_child_autofree(scene)
 
 func test_simple() -> void:
-    submit_report('some report', 'some report text')
+    submit_report('some report \u2b52', 'some report text')
     assert_feedback('Your feedback is being sent...')
 
     yield(wait_for_feedback('Feedback sent successfully, thank you!'),
@@ -64,7 +64,7 @@ func test_simple() -> void:
     assert_eq(cards.size(), 1)
     var card: Dictionary = cards[0]
 
-    assert_eq(card['name'], 'some report')
+    assert_eq(card['name'], 'some report ⭒')
     assert_string_starts_with(card['desc'], 'some report text')
     assert_string_contains(card['desc'], 'Operating System:')
     assert_eq(card['pos'], 10.0)
