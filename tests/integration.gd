@@ -34,7 +34,7 @@ func wait_for_feedback(expected: String) -> void:
     assert_feedback(expected)
 
 func before_each() -> void:
-    var scene = load('res://Trello_Reporting_Tool.tscn').instance()
+    var scene = load('res://src/Trello_Reporting_Tool.tscn').instance()
 
     # XXX: Ideally the node would be properly parametrizable, so let's override
     #      the variables we need to be changed in the ugliest way possible:

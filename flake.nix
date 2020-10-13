@@ -159,19 +159,20 @@
       } ''
         HOME="$PWD" gdlint "$src"
         mkdir -p "$out/libexec"
-        cp -rT "$src" "$out/libexec/godot-trello-reporting"
+        libexec="$out/libexec/godot-trello-reporting"
+        cp -rT "$src" "$libexec"
 
         mkdir -p "$out/bin"
         { echo ${lib.escapeShellArg "#!${pkgs.stdenv.shell}"}
           echo exec ${pkgs.godot}/bin/godot \
-            "$out/libexec/godot-trello-reporting/Trello_Reporting_Tool.tscn" \
+            "$libexec/src/Trello_Reporting_Tool.tscn" \
             '"$@"'
         } > "$out/bin/godot-trello-reporting"
         chmod +x "$out/bin/godot-trello-reporting"
       '';
 
       proxy = pkgs.runCommand "godot-trello-proxy" {
-        src = ./proxy.php;
+        src = src/proxy.php;
         nativeBuildInputs = [ pkgs.php ];
         cmdArgs = lib.escapeShellArgs [
           "${pkgs.php}/bin/php"

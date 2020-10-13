@@ -16,5 +16,5 @@ _global_script_class_icons={
 [application]
 
 config/name="Trello-Reporting-Tool"
-run/main_scene="res://Trello_Reporting_Tool.tscn"
+run/main_scene="res://src/Trello_Reporting_Tool.tscn"
 config/icon="res://icon.png"
