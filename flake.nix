@@ -134,7 +134,7 @@
           pkgs.python3Packages.mypy
         ];
         python3 = pkgs.python3.withPackages (p: lib.singleton p.flask);
-        src = ./minitrello.py;
+        src = tests/minitrello.py;
         cmdArgs = lib.escapeShellArgs [
           "${uwsgi}/bin/uwsgi" "--die-on-term" "--auto-procname"
           "--procname-prefix-spaced=[minitrello]"
@@ -200,7 +200,8 @@
       testRunner = pkgs.writeScriptBin "test-runner" ''
         #!${pkgs.stdenv.shell} -e
         cd ${lib.escapeShellArg srcPath}
-        exec ${godot-gut}/bin/godot-gut -gtest=res://test.gd -gexit
+        exec ${godot-gut}/bin/godot-gut \
+          -gtest=res://tests/integration.gd -gexit
       '';
 
       mkSnakeoilCert = domain: pkgs.runCommand "snakeoil-cert" {
