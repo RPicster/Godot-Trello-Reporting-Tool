@@ -1,3 +1,5 @@
+# This file is used mainly for continuous integration testing:
+# https://headcounter.org/hydra/jobset/picster/godot-trello#tabs-jobs
 {
   description = "Godot - Trello Reporting Tool";
 
