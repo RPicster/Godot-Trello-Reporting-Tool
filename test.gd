@@ -64,12 +64,7 @@ func test_simple() -> void:
     assert_eq(cards.size(), 1)
     var card: Dictionary = cards[0]
 
-    var regex = RegEx.new()
-    assert_eq(regex.compile('^some report \\[([^]]+)\\]$'), OK)
-    var re_match = regex.search(card['name'])
-    assert_not_null(re_match)
-    var identifier: String = re_match.get_string(1)
-
+    assert_eq(card['name'], 'some report')
     assert_string_starts_with(card['desc'], 'some report text')
     assert_string_contains(card['desc'], 'Operating System:')
     assert_eq(card['pos'], 10.0)

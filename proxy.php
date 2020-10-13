@@ -103,10 +103,6 @@ if ($label_id !== null && !preg_match('/^[0-9a-fA-F]{24}$/', $label_id)) {
     exit('invalid label_id');
 }
 
-$identifier = uniqid();
-$card_name = $_POST['name'].' ['.$identifier.']';
-$card_desc = $_POST['desc'];
-
 $cover = null;
 if (is_array($_FILES['cover'] ?? null)) {
     $cover = upload2curl($_FILES['cover'], true);
@@ -141,8 +137,8 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, [
     'token' => TRELLO_TOKEN,
     'key' => TRELLO_KEY,
     'idList' => TRELLO_LIST_ID,
-    'name' => $card_name,
-    'desc' => $card_desc,
+    'name' => $_POST['name'],
+    'desc' => $_POST['desc'],
     'pos' => 'top',
 ]);
 
