@@ -29,26 +29,37 @@ var trello_labels = {
 	}
 }
 
-onready var timer = Timer.new()
+onready var timer = $TimeoutTimer
 onready var http = HTTPClient.new()
-onready var short_text = $VBoxContainer/HBoxContainer/ShortDescEdit
-onready var long_text = $VBoxContainer/HBoxContainer/LongDescEdit
-onready var send_button = $VBoxContainer/HBoxContainer/Custom/Send
-onready var feedback = $VBoxContainer/HBoxContainer/Custom/feedback
+onready var short_text = $Content/Form/ShortDescEdit
+onready var long_text = $Content/Form/LongDescEdit
+onready var send_button = $Content/Form/Custom/Send
+onready var feedback = $Content/Feedback/feedback_label
+onready var close_button = $Content/Feedback/close_button
 
 func _ready():
 	timer.set_wait_time(0.2)
-	add_child(timer)
 	if !trello_labels.empty():
 		for i in range(trello_labels.size()):
-			$VBoxContainer/HBoxContainer/Custom/Type.add_item(trello_labels[i].label_description, i)
-		$VBoxContainer/HBoxContainer/Custom/Type.selected = 0
+			$Content/Form/Custom/Type.add_item(trello_labels[i].label_description, i)
+		$Content/Form/Custom/Type.selected = 0
 	else:
-		$VBoxContainer/HBoxContainer/Custom/Type.hide()
+		$Content/Form/Custom/Type.hide()
+		
+	# call this to show and reset the window
+	show_window()
+
+func show_window():
+	show()
+	$Content/Form.show()
+	$Content/Feedback.hide()
+	short_text.grab_focus()
+	short_text.text = ""
+	long_text.text = ""
+	$Content/Form/Custom/Type.selected = 0
 
 func _on_Send_pressed():
 	show_feedback()
-	send_button.disabled = true
 	create_card()
 
 class Attachment:
@@ -151,13 +162,15 @@ func parse_url(url: String) -> Dictionary:
 func create_card():
 	var data = {
 		'name': short_text.text,
-		'desc': long_text.text + "\n\n**Operating System:** " + OS.get_name(),
+		'desc': (long_text.text + "\n\n**Operating System:** " + OS.get_name()),
 	}
 
 	if !trello_labels.empty():
-		var type = $VBoxContainer/HBoxContainer/Custom/Type.selected
+		var type = $Content/Form/Custom/Type.selected
 		data['label_id'] = trello_labels[type].label_trello_id
 
+	# the cover attachment must be an image. If you don't want so sent further attachments, just leave attachments empty.
+	# Use the function 'from_path' to attach files from the filesystem or 'from_image' to convert an Image class variable to a file.
 	data['cover'] = Attachment.from_path("res://icon.png")
 	data['attachments'] = [
 		Attachment.from_image(
@@ -170,7 +183,7 @@ func create_card():
 
 	var parsed_url = parse_url(PROXY_URL)
 	if parsed_url.empty():
-		feedback.text = "Wrong proxy URL provided, can't send data :-("
+		change_feedback("Wrong proxy URL provided, can't send data :-(")
 		return
 
 	http.connect_to_host(
@@ -189,17 +202,17 @@ func create_card():
 		yield(timer, 'timeout')
 		timeout -= timer.get_wait_time()
 		if timeout < 0.0:
-			feedback.text = "Timeout while waiting to connect to server :-("
+			change_feedback("Timeout while waiting to connect to server :-(")
 			timer.stop()
 			return
 	timer.stop()
 
 	if http.get_status() != HTTPClient.STATUS_CONNECTED:
-		feedback.text = "Unable to connect to server :-("
+		change_feedback("Unable to connect to server :-(")
 		return
 
 	if send_post(http, parsed_url['path'], data) != OK:
-		feedback.text = "Unable to send feedback to server :-("
+		change_feedback("Unable to send feedback to server :-(")
 		return
 
 	timeout = 30.0
@@ -209,7 +222,7 @@ func create_card():
 		yield(timer, 'timeout')
 		timeout -= timer.get_wait_time()
 		if timeout < 0.0:
-			feedback.text = "Timeout waiting for server acknowledgement :-("
+			change_feedback("Timeout waiting for server acknowledgement :-(")
 			timer.stop()
 			return
 	timer.stop()
@@ -218,7 +231,7 @@ func create_card():
 		HTTPClient.STATUS_BODY,
 		HTTPClient.STATUS_CONNECTED
 	]:
-		feedback.text = "Unable to connect to server :-("
+		change_feedback("Unable to connect to server :-(")
 		return
 
 	if http.has_response() && http.get_response_code() != 200:
@@ -232,7 +245,7 @@ func create_card():
 				yield(timer, 'timeout')
 				timeout -= timer.get_wait_time()
 				if timeout < 0.0:
-					feedback.text = "Timeout waiting for server response :-("
+					change_feedback("Timeout waiting for server response :-(")
 					timer.stop()
 					return
 			else:
@@ -241,23 +254,30 @@ func create_card():
 		feedback.text = 'Error from server: ' + response.get_string_from_utf8()
 		return
 
-	feedback.text = "Feedback sent successfully, thank you!"
+	change_feedback("Feedback sent successfully, thank you!")
+	
 
 func show_feedback():
 	#disable all input fields and show a short message about the current status
-	send_button.hide()
-	short_text.editable = false
-	long_text.readonly = true
-	$VBoxContainer/HBoxContainer/Custom/Type.hide()
-	feedback.show()
-	feedback.text = "Your feedback is being sent..."
+	$Content/Form.hide()
+	$Content/Feedback.show()
+	change_feedback("Your feedback is being sent...", true)
 
-func _on_ShortDescEdit_text_changed(_new_text):
+func change_feedback( new_message : String, close_button_disabled := false ) -> void:
+	feedback.text = new_message
+	close_button.disabled = close_button_disabled
+	close_button.text = "Please wait" if close_button_disabled else "Close"
+	close_button.grab_focus()
+
+func _on_ShortDescEdit_text_changed(_new_text) -> void:
 	update_send_button()
 
-func _on_LongDescEdit_text_changed():
+func _on_LongDescEdit_text_changed() -> void:
 	update_send_button()
 
-func update_send_button():
+func update_send_button() -> void:
 	# check if text is entered, if not, disable the send button
 	send_button.disabled = (long_text.text == "" or short_text.text == "")
+
+func _on_close_button_pressed():
+	hide()
