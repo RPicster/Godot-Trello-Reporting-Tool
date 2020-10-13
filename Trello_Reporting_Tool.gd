@@ -45,7 +45,7 @@ func _ready():
 		$Content/Form/Custom/Type.selected = 0
 	else:
 		$Content/Form/Custom/Type.hide()
-		
+
 	# call this to show and reset the window
 	show_window()
 
@@ -169,8 +169,12 @@ func create_card():
 		var type = $Content/Form/Custom/Type.selected
 		data['label_id'] = trello_labels[type].label_trello_id
 
-	# the cover attachment must be an image. If you don't want so sent further attachments, just leave attachments empty.
-	# Use the function 'from_path' to attach files from the filesystem or 'from_image' to convert an Image class variable to a file.
+	# The cover attachment must be an image. If you don't want so sent further
+	# attachments, just leave attachments empty.
+	#
+	# Use the function Attachment.from_path() to attach files from the
+	# filesystem or Attachment.from_image() to convert an Image instance to a
+	# file.
 	data['cover'] = Attachment.from_path("res://icon.png")
 	data['attachments'] = [
 		Attachment.from_image(
@@ -255,7 +259,6 @@ func create_card():
 		return
 
 	change_feedback("Feedback sent successfully, thank you!")
-	
 
 func show_feedback():
 	#disable all input fields and show a short message about the current status
@@ -263,7 +266,7 @@ func show_feedback():
 	$Content/Feedback.show()
 	change_feedback("Your feedback is being sent...", true)
 
-func change_feedback( new_message : String, close_button_disabled := false ) -> void:
+func change_feedback(new_message: String, close_button_disabled: bool = false) -> void:
 	feedback.text = new_message
 	close_button.disabled = close_button_disabled
 	close_button.text = "Please wait" if close_button_disabled else "Close"
