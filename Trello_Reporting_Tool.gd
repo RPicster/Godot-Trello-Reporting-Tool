@@ -2,10 +2,16 @@ extends Panel
 
 # Trello Reporting Tool - by Raffaele Picca: twitter.com/MV_Raffa
 
-const PROXY_HOST = 'proxy.example'
-const PROXY_PATH = '/proxy.php'
+# The URL pointing to the webserver location where "proxy.php" from this
+# repository is served.
+const PROXY_URL = 'https://proxy.example/proxy.php'
 
+# Internal constants, only change if you must ;-)
 const POST_BOUNDARY: String = 'GodotFileUploadBoundaryZ29kb3RmaWxl'
+const URL_REGEX: String = \
+	'^(?:(?<scheme>https?)://)?' + \
+	'(?<host>\\[[a-fA-F0-9:.]+\\]|[^:/]+)' + \
+	'(?::(?<port>[0-9]+))?(?<path>$|/.*)'
 
 # If you don't want to use labels, just leave this dictionary empty, you can
 # add as many labels as you need by just expanding the library.
@@ -117,6 +123,31 @@ func send_post(http: HTTPClient, path: String, data: Dictionary) -> int:
 
 	return http.request_raw(HTTPClient.METHOD_POST, path, headers, body)
 
+func parse_url(url: String) -> Dictionary:
+	var regex = RegEx.new()
+
+	if regex.compile(URL_REGEX) != OK:
+		return {}
+
+	var re_match = regex.search(url)
+	if re_match == null:
+		return {}
+
+	var scheme = re_match.get_string('scheme')
+	if not scheme:
+		scheme = 'http'
+
+	var port: int = 80 if scheme == 'http' else 443
+	if re_match.get_string('port'):
+		port = int(re_match.get_string('port'))
+
+	return {
+		'scheme': scheme,
+		'host': re_match.get_string('host'),
+		'port': port,
+		'path': re_match.get_string('path'),
+	}
+
 func create_card():
 	var data = {
 		'name': short_text.text,
@@ -137,7 +168,16 @@ func create_card():
 		),
 	]
 
-	http.connect_to_host(PROXY_HOST, -1, true)
+	var parsed_url = parse_url(PROXY_URL)
+	if parsed_url.empty():
+		feedback.text = "Wrong proxy URL provided, can't send data :-("
+		return
+
+	http.connect_to_host(
+		parsed_url['host'],
+		parsed_url['port'],
+		parsed_url['scheme'] == 'https'
+	)
 
 	var timeout = 30.0
 	timer.start()
@@ -158,7 +198,7 @@ func create_card():
 		feedback.text = "Unable to connect to server :-("
 		return
 
-	if send_post(http, PROXY_PATH, data) != OK:
+	if send_post(http, parsed_url['path'], data) != OK:
 		feedback.text = "Unable to send feedback to server :-("
 		return
 
