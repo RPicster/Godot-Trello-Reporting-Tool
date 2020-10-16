@@ -2,7 +2,11 @@
 # Godot - Trello Reporting Tool
 **A tool to create Trello cards and add attachments from an in-game Godot interface.**
 
-How to use:
+
+![Image of the interface](https://abload.de/img/trello_reporting_toolb9kfe.png)
+
+### How to use:
+
 All you need inside your Godot project are the files `src\Trello_Reporting_Tool.gd` and `src\Trello_Reporting_Tool.tscn`. Copy those into your project and apply a theme to your liking.
 
 Thanks to the fantastic contributions of [@aszlig](https://github.com/aszlig) the tool now uses a proxy to make easy access to the Trello key and token through reverse engineering of the projects gdscript impossible.
