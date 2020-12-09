@@ -3,7 +3,7 @@
 **A tool to create Trello cards and add attachments from an in-game Godot interface.**
 
 
-![Image of the interface](https://raw.githubusercontent.com/RPicster/Godot-Trello-Reporting-Tool/main/icon.png)
+![Image of the interface](https://raw.githubusercontent.com/RPicster/Godot-Trello-Reporting-Tool/556f7be7b60ceec762193b35c44bda372d7caf27/icon.png)
 
 ### How to use:
 
