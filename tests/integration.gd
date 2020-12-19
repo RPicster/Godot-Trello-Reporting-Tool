@@ -81,12 +81,12 @@ func test_simple() -> void:
 
         match attachment['name']:
             'icon.png':
-                assert_eq(attachment['bytes'] as int, 3305)
+                assert_eq(attachment['bytes'] as int, 11938)
                 assert_eq(
                     attachment['chksum'],
                     # SHA-256 of icon.png:
-                    '2c160bfdb8d0423b958083202dc7b58d' +
-                    '499cbef22f28d2a58626884378ce9b7f'
+                    '2cb95be3137bf3d77f6626ee5f3ac79b' +
+                    '38eff5ac3142512191c0ba1dfae73f5d'
                 )
                 assert_eq(attachment['mimeType'], 'image/png')
             _:
