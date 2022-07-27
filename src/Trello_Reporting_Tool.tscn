@@ -148,6 +148,7 @@ margin_top = 92.0
 margin_right = 280.0
 margin_bottom = 112.0
 text = "Processing..."
+
 [connection signal="request_completed" from="HTTPRequest" to="." method="_on_HTTPRequest_request_completed"]
 [connection signal="text_changed" from="Content/Form/ShortDescEdit" to="." method="_on_ShortDescEdit_text_changed"]
 [connection signal="text_changed" from="Content/Form/LongDescEdit" to="." method="_on_LongDescEdit_text_changed"]
