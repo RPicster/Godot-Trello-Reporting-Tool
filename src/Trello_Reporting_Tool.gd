@@ -13,6 +13,8 @@ const URL_REGEX: String = \
 	"(?<host>\\[[a-fA-F0-9:.]+\\]|[^:/]+)" + \
 	"(?::(?<port>[0-9]+))?(?<path>$|/.*)"
 
+
+# This is just an example of a detail section, set this up in any way that helps you.
 const CARD_DETAIL_TEXT:String = \
 	"**Gameversion:** {game_version}\n" + \
 	"**Level:** {game_level}\n" + \
